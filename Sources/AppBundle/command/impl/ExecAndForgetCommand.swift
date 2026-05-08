@@ -4,6 +4,7 @@ import Common
 struct ExecAndForgetCommand: Command {
     let args: ExecAndForgetCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> BinaryExitCode {
         // todo shall exec-and-forget fork exec session?

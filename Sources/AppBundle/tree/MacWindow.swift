@@ -17,7 +17,10 @@ final class MacWindow: Window {
     @MainActor
     @discardableResult
     static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow {
-        if let existing = allWindowsMap[windowId] { return existing }
+        if let existing = allWindowsMap[windowId] {
+            try await existing.rebindIfMovedToCurrentNativeSpace()
+            return existing
+        }
         let rect = try await macApp.getAxRect(windowId)
         let data = try await unbindAndGetBindingDataForNewWindow(
             windowId,
@@ -38,6 +41,12 @@ final class MacWindow: Window {
             try await tryOnWindowDetected(window)
         }
         return window
+    }
+
+    @MainActor
+    private func rebindIfMovedToCurrentNativeSpace() async throws {
+        guard shouldRebindWindowToCurrentNativeSpace(from: nodeWorkspace, windowId: windowId) else { return }
+        try await relayoutWindow(on: focus.workspace)
     }
 
     // var description: String {

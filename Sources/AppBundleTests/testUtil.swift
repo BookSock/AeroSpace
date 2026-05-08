@@ -14,7 +14,27 @@ let projectRoot: URL = {
 }()
 
 @MainActor
-func setUpWorkspacesForTests() {
+func resetNativeSpaceStateForTests() {
+    nativeSpaceKeyForTests = nil
+    nativeSpaceIdsForWindowIdForTests = [:]
+    currentNativeSpaceIdsForTests = nil
+    currentNativeSpaceWindowIdsForTests = nil
+    isCurrentNativeSpaceUserForTests = true
+    isCurrentNativeSpaceWindowMembershipUnavailableForTests = false
+    appForTests = nil
+    resetFocusStateForTests()
+    resetWorkspaceStateForTests()
+}
+
+@MainActor
+func setUpWorkspacesForTests(nativeSpaceKey: NativeSpaceKey? = nil) {
+    nativeSpaceKeyForTests = nativeSpaceKey
+    nativeSpaceIdsForWindowIdForTests = [:]
+    currentNativeSpaceIdsForTests = nil
+    currentNativeSpaceWindowIdsForTests = nil
+    isCurrentNativeSpaceUserForTests = true
+    isCurrentNativeSpaceWindowMembershipUnavailableForTests = false
+    appForTests = nil
     config = defaultConfig
     configUrl = defaultConfigUrl
     config.enableNormalizationFlattenContainers = false // Make layout tests more predictable
@@ -30,6 +50,9 @@ func setUpWorkspacesForTests() {
             child.unbindFromParent()
         }
     }
+    for child in macosMinimizedWindowsContainer.children + macosPopupWindowsContainer.children {
+        child.unbindFromParent()
+    }
     check(Workspace.get(byName: "setUpWorkspacesForTests").focusWorkspace())
     Workspace.garbageCollectUnusedWorkspaces()
     check(focus.workspace.isEffectivelyEmpty)
@@ -38,6 +61,7 @@ func setUpWorkspacesForTests() {
 
     TestApp.shared.focusedWindow = nil
     TestApp.shared.windows = []
+    TestWindow.titleReadCount = 0
 }
 
 extension ParsedCmd {

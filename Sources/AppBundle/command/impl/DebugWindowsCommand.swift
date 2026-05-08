@@ -22,8 +22,14 @@ enum DebugWindowsState {
 struct DebugWindowsCommand: Command {
     let args: DebugWindowsCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    var canRunWhenNativeSpaceUnavailable: Bool { args.nativeSpaces }
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> BinaryExitCode {
+        if args.nativeSpaces {
+            io.out(JSONEncoder.aeroSpaceDefault.encodeToString(nativeSpacesDebugJson()).prettyDescription + "\n")
+            io.out(disclaimer)
+            return .succ
+        }
         if let windowId = args.windowId {
             guard let window = Window.get(byId: windowId) else {
                 return .fail(io.err("Can't find window with the specified window-id: \(windowId)"))

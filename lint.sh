@@ -16,5 +16,6 @@ else
         --strict \
         --disable-redundant-public-analysis \
         --no-superfluous-ignore-comments \
+        --report-exclude Sources/PrivateApi/include/private.m \
         --exclude-targets ShellParserGenerated
 fi

@@ -23,6 +23,7 @@ enum GlobalObserver {
         let notifName = notification.name.rawValue
         Task { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
+            if isNativeSpaceStateUnavailableForMutation { return }
             try await runLightSession(.globalObserver(notifName), token) {
                 if config.automaticallyUnhideMacosHiddenApps {
                     if let w = prevFocus?.windowOrNil,
@@ -59,6 +60,7 @@ enum GlobalObserver {
             //  The end of the callback calls refreshSession
             Task { @MainActor in
                 guard let token: RunSessionGuard = .isServerEnabled else { return }
+                if isNativeSpaceStateUnavailableForMutation { return }
                 try await resetManipulatedWithMouseIfPossible()
                 let mouseLocation = mouseLocation
                 let clickedMonitor = mouseLocation.monitorApproximation

@@ -16,6 +16,12 @@ start-at-login = false
 # After setting this to true, reload once manually to start the auto-reloading
 auto-reload-config = false
 
+# Experimental: namespace AeroSpace workspaces by native macOS Space.
+# This uses private SkyLight API and is not upstream-safe.
+# With multiple displays, the namespace is the tuple of current native Spaces across displays.
+# Only regular user Spaces are managed; fullscreen/tiled native Spaces are treated as unavailable.
+experimental-native-spaces = false
+
 # Normalizations. See: https://nikitabobko.github.io/AeroSpace/guide#normalization
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true

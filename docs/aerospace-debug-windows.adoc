@@ -9,7 +9,7 @@ include::util/man-attributes.adoc[]
 == Synopsis
 [verse]
 // tag::synopsis[]
-aerospace debug-windows [-h|--help] [--window-id <window-id>]
+aerospace debug-windows [-h|--help] [--native-spaces] [--window-id <window-id>]
 
 // end::synopsis[]
 
@@ -36,6 +36,25 @@ The only intended use case is to report bugs about incorrect windows handling.
 include::util/conditional-options-header.adoc[]
 
 -h, --help:: Print help
+
+--native-spaces::
+Print native macOS Spaces debug information right away.
+Usage of this flag disables interactive mode.
+The debug output reads native Spaces state even when `experimental-native-spaces` is disabled.
+`multi-space-window-ids` reports windows that macOS says belong to more than one native Space,
+such as sticky/all-Spaces windows.
+`space-type` is the raw macOS native Space type from SkyLight. `space-kind` maps known raw values
+to `user` or `fullscreen`; fullscreen includes tiled-app Spaces.
+`current-native-space-is-user` reports whether every current native Space is a regular user Space.
+When `experimental-native-spaces` is enabled, AeroSpace manages only `user` Spaces. Fullscreen,
+tiled-app, unknown, or unreadable current native Spaces are treated as unavailable for mutation.
+`current-space-window-ids-unavailable` reports whether current native Space window membership
+could not be read. When this is true, AeroSpace skips model mutation and blocks mutating commands
+until current native Space window membership is readable again.
+`window-spaces-api-timed-out` reports whether the private API for per-window native Space membership
+timed out. After a timeout, AeroSpace returns unavailable membership immediately for future calls.
+`window-spaces-unavailable-window-ids` reports windows whose native Space membership could not be read
+or timed out.
 
 --window-id <window-id>::
 Print debug information of the specified window right away.

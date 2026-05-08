@@ -49,10 +49,25 @@ private struct FrozenFocus: AeroAny, Equatable, Sendable {
     }
 }
 
-@MainActor private var _focus: FrozenFocus = {
+@MainActor private func defaultFrozenFocus() -> FrozenFocus {
     let monitor = mainMonitor
     return FrozenFocus(windowId: nil, workspaceName: monitor.activeWorkspace.name, monitorId_oneBased: monitor.monitorId_oneBased ?? 0)
-}()
+}
+@MainActor private var _focusByNativeSpace: [NativeSpaceKey: FrozenFocus] = [:]
+@MainActor private var _focus: FrozenFocus {
+    get {
+        let key = currentNativeSpaceKey
+        if let existing = _focusByNativeSpace[key] {
+            return existing
+        }
+        let result = defaultFrozenFocus()
+        _focusByNativeSpace[key] = result
+        return result
+    }
+    set {
+        _focusByNativeSpace[currentNativeSpaceKey] = newValue
+    }
+}
 
 /// Global focus.
 /// Commands must be cautious about accessing this property directly. There are legitimate cases.
@@ -101,44 +116,57 @@ extension Workspace {
     }
 }
 
-@MainActor private var _lastKnownFocus: FrozenFocus = _focus
+@MainActor private var _lastKnownFocusByNativeSpace: [NativeSpaceKey: FrozenFocus] = [:]
 
 // Used by workspace-back-and-forth
-@MainActor var _prevFocusedWorkspaceName: String? = nil {
-    didSet {
-        prevFocusedWorkspaceDate = .now
-    }
+@MainActor private var _prevFocusedWorkspaceNameByNativeSpace: [NativeSpaceKey: String] = [:]
+@MainActor private var prevFocusedWorkspaceDateByNativeSpace: [NativeSpaceKey: Date] = [:]
+@MainActor var prevFocusedWorkspaceDate: Date { prevFocusedWorkspaceDateByNativeSpace[currentNativeSpaceKey] ?? .distantPast }
+@MainActor var prevFocusedWorkspace: Workspace? {
+    _prevFocusedWorkspaceNameByNativeSpace[currentNativeSpaceKey].map { Workspace.get(byName: $0) }
 }
-@MainActor var prevFocusedWorkspaceDate: Date = .distantPast
-@MainActor var prevFocusedWorkspace: Workspace? { _prevFocusedWorkspaceName.map { Workspace.get(byName: $0) } }
 
 // Used by focus-back-and-forth
-@MainActor private var _prevFocus: FrozenFocus? = nil
-@MainActor var prevFocus: LiveFocus? { _prevFocus?.live.takeIf { $0 != focus } }
+@MainActor private var _prevFocusByNativeSpace: [NativeSpaceKey: FrozenFocus] = [:]
+@MainActor var prevFocus: LiveFocus? { _prevFocusByNativeSpace[currentNativeSpaceKey]?.live.takeIf { $0 != focus } }
 
 @MainActor private var onFocusChangedRecursionGuard = false
+
+@MainActor func resetFocusStateForTests() {
+    check(isUnitTest)
+    _focusByNativeSpace = [:]
+    _lastKnownFocusByNativeSpace = [:]
+    _prevFocusedWorkspaceNameByNativeSpace = [:]
+    prevFocusedWorkspaceDateByNativeSpace = [:]
+    _prevFocusByNativeSpace = [:]
+    onFocusChangedRecursionGuard = false
+}
+
 // Should be called in refreshSession
 @MainActor func checkOnFocusChangedCallbacks() {
     if refreshSessionEvent?.isStartup == true {
         return
     }
+    let nativeSpaceKey = currentNativeSpaceKey
     let focus = focus
     let frozenFocus = focus.frozen
+    let lastKnownFocus = _lastKnownFocusByNativeSpace[nativeSpaceKey] ?? frozenFocus
     var hasFocusChanged = false
     var hasFocusedWorkspaceChanged = false
     var hasFocusedMonitorChanged = false
-    if frozenFocus != _lastKnownFocus {
-        _prevFocus = _lastKnownFocus
+    if frozenFocus != lastKnownFocus {
+        _prevFocusByNativeSpace[nativeSpaceKey] = lastKnownFocus
         hasFocusChanged = true
     }
-    if frozenFocus.workspaceName != _lastKnownFocus.workspaceName {
-        _prevFocusedWorkspaceName = _lastKnownFocus.workspaceName
+    if frozenFocus.workspaceName != lastKnownFocus.workspaceName {
+        _prevFocusedWorkspaceNameByNativeSpace[nativeSpaceKey] = lastKnownFocus.workspaceName
+        prevFocusedWorkspaceDateByNativeSpace[nativeSpaceKey] = .now
         hasFocusedWorkspaceChanged = true
     }
-    if frozenFocus.monitorId_oneBased != _lastKnownFocus.monitorId_oneBased {
+    if frozenFocus.monitorId_oneBased != lastKnownFocus.monitorId_oneBased {
         hasFocusedMonitorChanged = true
     }
-    _lastKnownFocus = frozenFocus
+    _lastKnownFocusByNativeSpace[nativeSpaceKey] = frozenFocus
 
     if onFocusChangedRecursionGuard { return }
     onFocusChangedRecursionGuard = true
@@ -146,8 +174,8 @@ extension Workspace {
     if hasFocusChanged {
         onFocusChanged(focus)
     }
-    if let _prevFocusedWorkspaceName, hasFocusedWorkspaceChanged {
-        onWorkspaceChanged(_prevFocusedWorkspaceName, frozenFocus.workspaceName)
+    if let prevFocusedWorkspaceName = _prevFocusedWorkspaceNameByNativeSpace[nativeSpaceKey], hasFocusedWorkspaceChanged {
+        onWorkspaceChanged(prevFocusedWorkspaceName, frozenFocus.workspaceName)
     }
     if hasFocusedMonitorChanged {
         onFocusedMonitorChanged(focus)

@@ -33,6 +33,11 @@ func runHeavyCompleteRefreshSession(
     let res = await Result {
         try await $refreshSessionEvent.withValue(event) {
             try await $_isStartup.withValue(event.isStartup) {
+                if isNativeSpaceStateUnavailableForMutation {
+                    updateTrayText()
+                    SecureInputPanel.shared.refresh()
+                    return
+                }
                 let nativeFocused = try await getNativeFocusedWindow()
                 if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
                 updateFocusCache(nativeFocused)
@@ -69,6 +74,15 @@ func runLightSession<T>(
     activeRefreshTask = nil
     return try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
+            if isNativeSpaceStateUnavailableForMutation {
+                refreshModel()
+                let result = try await body()
+                refreshModel()
+                updateTrayText()
+                SecureInputPanel.shared.refresh()
+                scheduleCancellableCompleteRefreshSession(event)
+                return result
+            }
             let nativeFocused = try await getNativeFocusedWindow()
             if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
             updateFocusCache(nativeFocused)
@@ -114,6 +128,9 @@ struct RunSessionGuard: Sendable {
 
 @MainActor
 func refreshModel() {
+    if isNativeSpaceStateUnavailableForMutation {
+        return
+    }
     Workspace.garbageCollectUnusedWorkspaces()
     checkOnFocusChangedCallbacks()
     normalizeContainers()
@@ -122,10 +139,25 @@ func refreshModel() {
 @MainActor
 private func refresh() async throws {
     // Garbage collect terminated apps and windows before working with all windows
-    let mapping = try await MacApp.refreshAllAndGetAliveWindowIds(frontmostAppBundleId: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+    let rawMapping = try await MacApp.refreshAllAndGetAliveWindowIds(frontmostAppBundleId: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+    let nativeSnapshot = currentNativeSpaceWindowSnapshot()
+    let nativeWindowIds = nativeSnapshot?.windowIds
+    if isExperimentalNativeSpacesEnabled && nativeWindowIds == nil {
+        return
+    }
+    let mapping = nativeWindowIds.map { nativeWindowIds in
+        rawMapping.mapValues { windowIds in windowIds.filter { nativeWindowIds.contains($0) } }
+    } ?? rawMapping
     let aliveWindowIds = mapping.values.flatMap(id).toSet()
 
     for window in MacWindow.allWindows {
+        if !shouldCheckWindowLivenessInCurrentNativeSpace(
+            window,
+            snapshotNativeSpaceKey: nativeSnapshot?.key,
+            currentNativeWindowIds: nativeWindowIds,
+        ) {
+            continue
+        }
         if !aliveWindowIds.contains(window.windowId) {
             window.garbageCollect(skipClosedWindowsCache: false)
         }
@@ -154,6 +186,9 @@ enum OptimalHideCorner {
 
 @MainActor
 private func layoutWorkspaces() async throws {
+    if isNativeSpaceStateUnavailableForMutation {
+        return
+    }
     if !TrayMenuModel.shared.isEnabled {
         for workspace in Workspace.all {
             workspace.allLeafWindowsRecursive.forEach { ($0 as! MacWindow).unhideFromCorner() } // todo as!

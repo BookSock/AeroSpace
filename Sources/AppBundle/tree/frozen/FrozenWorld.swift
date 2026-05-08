@@ -1,4 +1,5 @@
 struct FrozenWorld {
+    let nativeSpaceKey: NativeSpaceKey
     let workspaces: [FrozenWorkspace]
     let monitors: [FrozenMonitor]
     let windowIds: Set<UInt32>

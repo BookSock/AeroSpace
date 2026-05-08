@@ -4,7 +4,13 @@
 ///                      (from nativeFocused to lastKnownNativeFocusedWindowId)
 /// Alternative names: takeFocusFromMacOs, syncFocusFromMacOs
 @MainActor func updateFocusCache(_ nativeFocused: Window?) {
+    if isNativeSpaceStateUnavailableForMutation {
+        return
+    }
     if nativeFocused?.parent is MacosPopupWindowsContainer {
+        return
+    }
+    if isExperimentalNativeSpacesEnabled && nativeFocused?.isHiddenInCorner == true {
         return
     }
     if nativeFocused?.windowId != lastKnownNativeFocusedWindowId {

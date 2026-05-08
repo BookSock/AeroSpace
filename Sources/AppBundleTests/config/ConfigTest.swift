@@ -19,6 +19,16 @@ final class ConfigTest: XCTestCase {
         assertEquals(errors, [])
     }
 
+    func testParseExperimentalNativeSpaces() {
+        let (config, errors) = parseConfig(
+            """
+            experimental-native-spaces = true
+            """,
+        )
+        assertEquals(errors, [])
+        XCTAssertTrue(config.experimentalNativeSpaces)
+    }
+
     func testConfigVersionOutOfBounds() {
         let (_, errors) = parseConfig(
             """

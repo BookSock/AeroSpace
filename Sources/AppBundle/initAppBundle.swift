@@ -28,8 +28,10 @@ import Foundation
         checkAccessibilityPermissions()
         startUnixSocketServer()
         GlobalObserver.initObserver()
-        Workspace.garbageCollectUnusedWorkspaces() // init workspaces
-        _ = Workspace.all.first?.focusWorkspace()
+        if !isNativeSpaceStateUnavailableForMutation {
+            Workspace.garbageCollectUnusedWorkspaces() // init workspaces
+            _ = Workspace.all.first?.focusWorkspace()
+        }
         await runHeavyCompleteRefreshSession(
             .startup,
             // It's important for the first initialization to be non cancellable
@@ -46,6 +48,9 @@ import Foundation
 
 @MainActor
 private func smartLayoutAtStartup() {
+    if isNativeSpaceStateUnavailableForMutation {
+        return
+    }
     let workspace = focus.workspace
     let root = workspace.rootTilingContainer
     switch root.children.count <= 3 {

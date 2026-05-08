@@ -41,7 +41,7 @@ final class ListWindowsTest: XCTestCase {
                 case .app:
                     assertTrue(FormatVar.AppFormatVar.allCases.allSatisfy { $0.rawValue.starts(with: "app-") })
                 case .workspace:
-                    assertTrue(FormatVar.WorkspaceFormatVar.allCases.allSatisfy { $0.rawValue.starts(with: "workspace") })
+                    assertTrue(FormatVar.WorkspaceFormatVar.allCases.allSatisfy { $0.rawValue == "native-space" || $0.rawValue.starts(with: "workspace") })
                 case .monitor:
                     assertTrue(FormatVar.MonitorFormatVar.allCases.allSatisfy { $0.rawValue.starts(with: "monitor-") })
             }
@@ -72,5 +72,21 @@ final class ListWindowsTest: XCTestCase {
             ]
             assertEquals(windows.format([.interVar("window-id"), .interVar("right-padding"), .literal(" | "), .interVar("window-title")]), .success(["2  | title1", "10 | title2"]))
         }
+    }
+
+    func testDoesNotReadWindowTitleWhenFormatDoesNotNeedIt() async throws {
+        let window = TestWindow.new(id: 1, parent: Workspace.get(byName: name).rootTilingContainer)
+
+        _ = try await WindowWithPrefetchedTitle.resolveWindow(window, for: [.interVar("window-id")])
+
+        assertEquals(TestWindow.titleReadCount, 0)
+    }
+
+    func testReadsWindowTitleWhenFormatNeedsIt() async throws {
+        let window = TestWindow.new(id: 1, parent: Workspace.get(byName: name).rootTilingContainer)
+
+        _ = try await WindowWithPrefetchedTitle.resolveWindow(window, for: [.interVar("window-title")])
+
+        assertEquals(TestWindow.titleReadCount, 1)
     }
 }

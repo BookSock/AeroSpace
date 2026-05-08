@@ -16,6 +16,19 @@ final class MoveCommandTest: XCTestCase {
         assertEquals(root.layoutDescription, .h_tiles([.window(2), .window(1)]))
     }
 
+    func testSwapWindows_directBothOrders() {
+        let root = Workspace.get(byName: name).rootTilingContainer
+        let window1 = TestWindow.new(id: 1, parent: root)
+        TestWindow.new(id: 2, parent: root)
+        let window3 = TestWindow.new(id: 3, parent: root)
+
+        swapWindows(window1, window3)
+        assertEquals(root.layoutDescription, .h_tiles([.window(3), .window(2), .window(1)]))
+
+        swapWindows(window1, window3)
+        assertEquals(root.layoutDescription, .h_tiles([.window(1), .window(2), .window(3)]))
+    }
+
     func testMoveInto_findTopMostContainerWithRightOrientation() async throws {
         let root = Workspace.get(byName: name).rootTilingContainer.apply {
             TestWindow.new(id: 0, parent: $0)

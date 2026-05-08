@@ -10,9 +10,15 @@ protocol Command: AeroAny, Equatable, Sendable {
 
     /// We should reset closedWindowsCache when the command can potentially change the tree
     var shouldResetClosedWindowsCache: Bool { get }
+
+    /// Private native Spaces APIs can temporarily fail during macOS Space transitions.
+    /// Commands that inspect external state may still run; tree/focus/window mutators must wait.
+    var canRunWhenNativeSpaceUnavailable: Bool { get }
 }
 
 extension Command {
+    var canRunWhenNativeSpaceUnavailable: Bool { false }
+
     static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.args.equals(rhs.args)
     }
@@ -46,6 +52,11 @@ extension [Command] {
     func runCmdSeq(_ env: CmdEnv, _ io: sending CmdIo) async throws -> Int32ExitCode {
         var exitCode = Int32ExitCode(rawValue: EXIT_CODE_ZERO)
         for command in self {
+            if !command.canRunWhenNativeSpaceUnavailable && isNativeSpaceStateUnavailableForMutation {
+                return Int32ExitCode(rawValue: command.args.failExitCode).also { _ in
+                    io.err("Native macOS Space is unavailable")
+                }
+            }
             exitCode = Int32ExitCode(rawValue: (try await command.run(env, io)).rawValue)
             if command.shouldResetClosedWindowsCache { resetClosedWindowsCache() }
             refreshModel()

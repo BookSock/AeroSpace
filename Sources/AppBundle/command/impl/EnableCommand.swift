@@ -4,6 +4,7 @@ import Common
 struct EnableCommand: Command {
     let args: EnableCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> BinaryExitCode {
         let prevState = TrayMenuModel.shared.isEnabled

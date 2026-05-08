@@ -16,6 +16,12 @@ public final class TrayMenuModel: ObservableObject {
 }
 
 @MainActor func updateTrayText() {
+    if isNativeSpaceStateUnavailableForMutation {
+        TrayMenuModel.shared.trayText = NativeSpaceKey.unavailable.raw
+        TrayMenuModel.shared.workspaces = []
+        TrayMenuModel.shared.trayItems = []
+        return
+    }
     let sortedMonitors = sortedMonitors
     let focus = focus
     TrayMenuModel.shared.trayText = (activeMode?.takeIf { $0 != mainModeId }?.first.map { "(\($0.uppercased())) " } ?? "") +

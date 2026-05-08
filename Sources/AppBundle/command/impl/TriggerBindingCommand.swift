@@ -4,6 +4,7 @@ import Common
 struct TriggerBindingCommand: Command {
     let args: TriggerBindingCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Int32ExitCode {
         return if let mode = config.modes[args.mode] {

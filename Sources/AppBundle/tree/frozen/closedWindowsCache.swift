@@ -7,7 +7,7 @@ import Common
 /// becomes nil, etc.) which tricks AeroSpace into thinking that all windows were closed.
 /// That's why every time a window dies AeroSpace caches the "entire world" (unless window is already presented in the cache)
 /// so that once the screen is unlocked, AeroSpace could restore windows to where they were
-@MainActor private var closedWindowsCache = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
+@MainActor private var closedWindowsCache = FrozenWorld(nativeSpaceKey: .global, workspaces: [], monitors: [], windowIds: [])
 
 struct FrozenMonitor: Sendable {
     let topLeftCorner: CGPoint
@@ -40,10 +40,11 @@ struct FrozenWorkspace: Sendable {
 @MainActor func cacheClosedWindowIfNeeded() {
     let allWs = Workspace.all
     let allWindowIds = allWs.flatMap { collectAllWindowIds(workspace: $0) }.toSet()
-    if allWindowIds.isSubset(of: closedWindowsCache.windowIds) {
+    if closedWindowsCache.nativeSpaceKey == currentNativeSpaceKey && allWindowIds.isSubset(of: closedWindowsCache.windowIds) {
         return // already cached
     }
     closedWindowsCache = FrozenWorld(
+        nativeSpaceKey: currentNativeSpaceKey,
         workspaces: allWs.map { FrozenWorkspace($0) },
         monitors: monitors.map(FrozenMonitor.init),
         windowIds: allWindowIds,
@@ -52,6 +53,9 @@ struct FrozenWorkspace: Sendable {
 
 @MainActor func restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: Window) async throws -> Bool {
     if !closedWindowsCache.windowIds.contains(newlyDetectedWindow.windowId) {
+        return false
+    }
+    if closedWindowsCache.nativeSpaceKey != currentNativeSpaceKey {
         return false
     }
     let monitors = monitors
@@ -122,5 +126,5 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
 // That's why we have to reset the cache every time layout changes. The layout can only be changed by running commands
 // and with mouse manipulations
 @MainActor func resetClosedWindowsCache() {
-    closedWindowsCache = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
+    closedWindowsCache = FrozenWorld(nativeSpaceKey: currentNativeSpaceKey, workspaces: [], monitors: [], windowIds: [])
 }

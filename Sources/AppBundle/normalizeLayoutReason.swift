@@ -1,5 +1,8 @@
 @MainActor
 func normalizeLayoutReason() async throws {
+    if isNativeSpaceStateUnavailableForMutation {
+        return
+    }
     for workspace in Workspace.all {
         let windows: [Window] = workspace.allLeafWindowsRecursive
         try await _normalizeLayoutReason(workspace: workspace, windows: windows)

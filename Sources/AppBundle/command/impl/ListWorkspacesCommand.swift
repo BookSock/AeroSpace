@@ -4,8 +4,12 @@ import Common
 struct ListWorkspacesCommand: Command {
     let args: ListWorkspacesCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> BinaryExitCode {
+        if isNativeSpaceStateUnavailableForMutation {
+            return output(result: [], io: io)
+        }
         var result: [Workspace] = Workspace.all
         if let visible = args.filteringOptions.visible {
             result = result.filter { $0.isVisible == visible }
@@ -19,6 +23,11 @@ struct ListWorkspacesCommand: Command {
             result = result.filter { $0.isEffectivelyEmpty == empty }
         }
 
+        return output(result: result, io: io)
+    }
+
+    @MainActor
+    private func output(result: [Workspace], io: CmdIo) -> BinaryExitCode {
         lazy var list = result.map() { AeroObj.workspace($0) }
         return switch true {
             case args.outputOnlyCount:

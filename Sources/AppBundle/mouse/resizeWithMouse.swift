@@ -9,6 +9,10 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
     let windowId = ax.containingWindowId()
     Task { @MainActor in
         guard let token: RunSessionGuard = .isServerEnabled else { return }
+        if isNativeSpaceStateUnavailableForMutation {
+            scheduleCancellableCompleteRefreshSession(.ax(notif))
+            return
+        }
         guard let windowId, let window = Window.get(byId: windowId), try await isManipulatedWithMouse(window) else {
             scheduleCancellableCompleteRefreshSession(.ax(notif))
             return

@@ -9,6 +9,10 @@ func movedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutableR
     let notif = notif as String
     Task { @MainActor in
         guard let token: RunSessionGuard = .isServerEnabled else { return }
+        if isNativeSpaceStateUnavailableForMutation {
+            scheduleCancellableCompleteRefreshSession(.ax(notif))
+            return
+        }
         guard let windowId, let window = Window.get(byId: windowId), try await isManipulatedWithMouse(window) else {
             scheduleCancellableCompleteRefreshSession(.ax(notif))
             return
@@ -76,7 +80,7 @@ private func moveTilingWindow(_ window: Window) {
 func swapWindows(_ window1: Window, _ window2: Window) {
     if window1 == window2 { return }
     guard let index1 = window1.ownIndex else { return }
-    guard let index2 = window1.ownIndex else { return }
+    guard let index2 = window2.ownIndex else { return }
 
     if index1 < index2 {
         let binding2 = window2.unbindFromParent()

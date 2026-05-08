@@ -1,11 +1,35 @@
 import AppKit
 import Common
 
-@MainActor private var workspaceNameToWorkspace: [String: Workspace] = [:]
+private struct WorkspaceLookupKey: Hashable {
+    let nativeSpaceKey: NativeSpaceKey
+    // periphery:ignore - Used by synthesized Hashable/Equatable conformance.
+    let name: String
+}
 
-@MainActor private var screenPointToPrevVisibleWorkspace: [CGPoint: String] = [:]
-@MainActor private var screenPointToVisibleWorkspace: [CGPoint: Workspace] = [:]
+private struct NativeScreenPointKey: Hashable {
+    let nativeSpaceKey: NativeSpaceKey
+    let point: CGPoint
+}
+
+@MainActor private var workspaceNameToWorkspace: [WorkspaceLookupKey: Workspace] = [:]
+
+@MainActor private var screenPointToPrevVisibleWorkspace: [NativeScreenPointKey: String] = [:]
+@MainActor private var screenPointToVisibleWorkspace: [NativeScreenPointKey: Workspace] = [:]
 @MainActor private var visibleWorkspaceToScreenPoint: [Workspace: CGPoint] = [:]
+
+@MainActor func resetWorkspaceStateForTests() {
+    check(isUnitTest)
+    for workspace in workspaceNameToWorkspace.values {
+        for child in workspace.children {
+            child.unbindFromParent()
+        }
+    }
+    workspaceNameToWorkspace = [:]
+    screenPointToPrevVisibleWorkspace = [:]
+    screenPointToVisibleWorkspace = [:]
+    visibleWorkspaceToScreenPoint = [:]
+}
 
 // The returned workspace must be invisible and it must belong to the requested monitor
 @MainActor func getStubWorkspace(for monitor: Monitor) -> Workspace {
@@ -14,7 +38,8 @@ import Common
 
 @MainActor
 private func getStubWorkspace(forPoint point: CGPoint) -> Workspace {
-    if let prev = screenPointToPrevVisibleWorkspace[point].map({ Workspace.get(byName: $0) }),
+    let pointKey = NativeScreenPointKey(nativeSpaceKey: currentNativeSpaceKey, point: point)
+    if let prev = screenPointToPrevVisibleWorkspace[pointKey].map({ Workspace.get(byName: $0) }),
        !prev.isVisible && prev.workspaceMonitor.rect.topLeftCorner == point && prev.forceAssignedMonitor == nil
     {
         return prev
@@ -32,33 +57,40 @@ private func getStubWorkspace(forPoint point: CGPoint) -> Workspace {
 
 final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     let name: String
+    let nativeSpaceKey: NativeSpaceKey
     nonisolated private let nameLogicalSegments: StringLogicalSegments
     /// `assignedMonitorPoint` must be interpreted only when the workspace is invisible
     fileprivate var assignedMonitorPoint: CGPoint? = nil
 
     @MainActor
-    private init(_ name: String) {
+    private init(_ name: String, nativeSpaceKey: NativeSpaceKey) {
         self.name = name
+        self.nativeSpaceKey = nativeSpaceKey
         self.nameLogicalSegments = name.toLogicalSegments()
         super.init(parent: NilTreeNode.instance, adaptiveWeight: 0, index: 0)
     }
 
     @MainActor static var all: [Workspace] {
-        workspaceNameToWorkspace.values.sorted()
+        workspaceNameToWorkspace.values
+            .filter { $0.nativeSpaceKey == currentNativeSpaceKey }
+            .sorted()
     }
 
     @MainActor static func get(byName name: String) -> Workspace {
-        if let existing = workspaceNameToWorkspace[name] {
+        let key = WorkspaceLookupKey(nativeSpaceKey: currentNativeSpaceKey, name: name)
+        if let existing = workspaceNameToWorkspace[key] {
             return existing
         } else {
-            let workspace = Workspace(name)
-            workspaceNameToWorkspace[name] = workspace
+            let workspace = Workspace(name, nativeSpaceKey: key.nativeSpaceKey)
+            workspaceNameToWorkspace[key] = workspace
             return workspace
         }
     }
 
     nonisolated static func < (lhs: Workspace, rhs: Workspace) -> Bool {
-        lhs.nameLogicalSegments < rhs.nameLogicalSegments
+        lhs.nativeSpaceKey == rhs.nativeSpaceKey
+            ? lhs.nameLogicalSegments < rhs.nameLogicalSegments
+            : lhs.nativeSpaceKey < rhs.nativeSpaceKey
     }
 
     override func getWeight(_ targetOrientation: Orientation) -> CGFloat {
@@ -73,6 +105,7 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     var description: String {
         let description = [
             ("name", name),
+            ("nativeSpaceKey", nativeSpaceKey.raw),
             ("isVisible", String(isVisible)),
             ("isEffectivelyEmpty", String(isEffectivelyEmpty)),
             ("doKeepAlive", String(config.persistentWorkspaces.contains(name))),
@@ -82,11 +115,15 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
 
     @MainActor
     static func garbageCollectUnusedWorkspaces() {
+        if isNativeSpaceStateUnavailableForMutation {
+            return
+        }
         for name in config.persistentWorkspaces {
             _ = get(byName: name) // Make sure that all persistent workspaces are "cached"
         }
         workspaceNameToWorkspace = workspaceNameToWorkspace.filter { (_, workspace: Workspace) in
-            config.persistentWorkspaces.contains(workspace.name) ||
+            workspace.nativeSpaceKey != currentNativeSpaceKey ||
+                config.persistentWorkspaces.contains(workspace.name) ||
                 !workspace.isEffectivelyEmpty ||
                 workspace.isVisible ||
                 workspace.name == focus.workspace.name
@@ -94,11 +131,14 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     }
 
     nonisolated static func == (lhs: Workspace, rhs: Workspace) -> Bool {
-        check((lhs === rhs) == (lhs.name == rhs.name), "lhs: \(lhs) rhs: \(rhs)")
+        check((lhs === rhs) == (lhs.name == rhs.name && lhs.nativeSpaceKey == rhs.nativeSpaceKey), "lhs: \(lhs) rhs: \(rhs)")
         return lhs === rhs
     }
 
-    nonisolated func hash(into hasher: inout Hasher) { hasher.combine(name) }
+    nonisolated func hash(into hasher: inout Hasher) {
+        hasher.combine(nativeSpaceKey)
+        hasher.combine(name)
+    }
 }
 
 extension Workspace {
@@ -116,7 +156,8 @@ extension Workspace {
 extension Monitor {
     @MainActor
     var activeWorkspace: Workspace {
-        if let existing = screenPointToVisibleWorkspace[rect.topLeftCorner] {
+        let key = NativeScreenPointKey(nativeSpaceKey: currentNativeSpaceKey, point: rect.topLeftCorner)
+        if let existing = screenPointToVisibleWorkspace[key] {
             return existing
         }
         // What if monitor configuration changed? (frame.origin is changed)
@@ -134,7 +175,10 @@ extension Monitor {
 
 @MainActor
 func gcMonitors() {
-    if screenPointToVisibleWorkspace.count != monitors.count {
+    if isNativeSpaceStateUnavailableForMutation {
+        return
+    }
+    if visibleWorkspaceCountInCurrentNativeSpace != monitors.count {
         rearrangeWorkspacesOnMonitors()
     }
 }
@@ -145,18 +189,21 @@ extension CGPoint {
         if !isValidAssignment(workspace: workspace, screen: self) {
             return false
         }
+        let nativeSpaceKey = currentNativeSpaceKey
+        let thisPointKey = NativeScreenPointKey(nativeSpaceKey: nativeSpaceKey, point: self)
         if let prevMonitorPoint = visibleWorkspaceToScreenPoint[workspace] {
+            let prevMonitorPointKey = NativeScreenPointKey(nativeSpaceKey: nativeSpaceKey, point: prevMonitorPoint)
             visibleWorkspaceToScreenPoint.removeValue(forKey: workspace)
-            screenPointToPrevVisibleWorkspace[prevMonitorPoint] =
-                screenPointToVisibleWorkspace.removeValue(forKey: prevMonitorPoint)?.name
+            screenPointToPrevVisibleWorkspace[prevMonitorPointKey] =
+                screenPointToVisibleWorkspace.removeValue(forKey: prevMonitorPointKey)?.name
         }
-        if let prevWorkspace = screenPointToVisibleWorkspace[self] {
-            screenPointToPrevVisibleWorkspace[self] =
-                screenPointToVisibleWorkspace.removeValue(forKey: self)?.name
+        if let prevWorkspace = screenPointToVisibleWorkspace[thisPointKey] {
+            screenPointToPrevVisibleWorkspace[thisPointKey] =
+                screenPointToVisibleWorkspace.removeValue(forKey: thisPointKey)?.name
             visibleWorkspaceToScreenPoint.removeValue(forKey: prevWorkspace)
         }
         visibleWorkspaceToScreenPoint[workspace] = self
-        screenPointToVisibleWorkspace[self] = workspace
+        screenPointToVisibleWorkspace[thisPointKey] = workspace
         workspace.assignedMonitorPoint = self
         return true
     }
@@ -164,9 +211,11 @@ extension CGPoint {
 
 @MainActor
 private func rearrangeWorkspacesOnMonitors() {
+    let nativeSpaceKey = currentNativeSpaceKey
     let newScreens = monitors.map(\.rect.topLeftCorner)
     var newScreenToOldScreenMapping: [CGPoint: CGPoint] = [:]
-    for (oldScreen, _) in screenPointToVisibleWorkspace {
+    for (key, _) in screenPointToVisibleWorkspace where key.nativeSpaceKey == nativeSpaceKey {
+        let oldScreen = key.point
         guard let newScreen = newScreens.minBy({ ($0 - oldScreen).vectorLength }) else { continue }
         if let prevOldScreen = newScreenToOldScreenMapping[newScreen] {
             if (prevOldScreen - newScreen).vectorLength <= (oldScreen - newScreen).vectorLength {
@@ -177,9 +226,17 @@ private func rearrangeWorkspacesOnMonitors() {
         newScreenToOldScreenMapping[newScreen] = oldScreen
     }
 
-    let oldScreenPointToVisibleWorkspace = screenPointToVisibleWorkspace
-    screenPointToVisibleWorkspace = [:]
-    visibleWorkspaceToScreenPoint = [:]
+    let oldScreenPointToVisibleWorkspace = Dictionary(uniqueKeysWithValues: screenPointToVisibleWorkspace.compactMap { key, workspace in
+        key.nativeSpaceKey == nativeSpaceKey ? (key.point, workspace) : nil
+    })
+    let keysToRemove = screenPointToVisibleWorkspace.keys.filter { $0.nativeSpaceKey == nativeSpaceKey }
+    for key in keysToRemove {
+        let workspace = screenPointToVisibleWorkspace[key]
+        screenPointToVisibleWorkspace.removeValue(forKey: key)
+        if let workspace {
+            visibleWorkspaceToScreenPoint.removeValue(forKey: workspace)
+        }
+    }
 
     for newScreen in newScreens {
         if let existingVisibleWorkspace = newScreenToOldScreenMapping[newScreen].flatMap({ oldScreenPointToVisibleWorkspace[$0] }),
@@ -197,6 +254,12 @@ private func rearrangeWorkspacesOnMonitors() {
 private func isValidAssignment(workspace: Workspace, screen: CGPoint) -> Bool {
     switch workspace.forceAssignedMonitor {
         case let forceAssigned? where forceAssigned.rect.topLeftCorner != screen: false
+        case _ where workspace.nativeSpaceKey != currentNativeSpaceKey: false
         default: true
     }
+}
+
+@MainActor
+private var visibleWorkspaceCountInCurrentNativeSpace: Int {
+    screenPointToVisibleWorkspace.keys.count { $0.nativeSpaceKey == currentNativeSpaceKey }
 }

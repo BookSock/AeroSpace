@@ -4,6 +4,7 @@ import Common
 struct ReloadConfigCommand: Command {
     let args: ReloadConfigCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> BinaryExitCode {
         var stdout = ""

@@ -2,6 +2,8 @@
 import AppKit
 
 final class TestWindow: Window, CustomStringConvertible {
+    @MainActor static var titleReadCount = 0
+
     private var _rect: Rect?
 
     @MainActor
@@ -32,7 +34,8 @@ final class TestWindow: Window, CustomStringConvertible {
 
     override var title: String {
         get async { // redundant async. todo create bug report to Swift
-            description
+            await MainActor.run { TestWindow.titleReadCount += 1 }
+            return description
         }
     }
 

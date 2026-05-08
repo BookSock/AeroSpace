@@ -25,4 +25,9 @@
 // func _AXUIElementGetWindow(_ axUiElement: AXUIElement, _ id: inout CGWindowID) -> AXError
 AXError _AXUIElementGetWindow(AXUIElementRef element, uint32_t *identifier);
 
+CFArrayRef aerospace_SLSCopyManagedDisplaySpaces(void);
+CFArrayRef aerospace_SLSCopyWindowsForSpace(uint64_t sid);
+CFArrayRef aerospace_SLSCopySpacesForWindow(uint32_t wid);
+bool aerospace_SLSCopySpacesForWindowsDidTimeout(void);
+
 #endif

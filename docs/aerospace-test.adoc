@@ -58,6 +58,7 @@ The way the expression is interpreted depends on the type of `<lhs>` and the inf
 include::./util/conditional-interpolation-variables-header.adoc[]
 
 %{window-id}:: Number. Window unique ID
+%{window-native-spaces}:: String. Native macOS Space IDs that contain the window. Empty unless `experimental-native-spaces` is enabled. `unavailable` if native Space membership could not be read.
 %{window-title}:: String. Window title
 %{window-is-fullscreen}:: Boolean. Is window in fullscreen by `aerospace fullscreen` command
 %{window-layout}:: String. An alias for `%{window-parent-container-layout}`
@@ -70,6 +71,7 @@ include::./util/conditional-interpolation-variables-header.adoc[]
 %{app-bundle-path}:: String. Application bundle path
  
 %{workspace}:: String. Name of the belonging workspace
+%{native-space}:: String. Native macOS Space namespace of the belonging workspace
 %{workspace-is-focused}:: Boolean. `true` if the workspace has focus
 %{workspace-is-visible}:: Boolean. `true` if the workspace is visible. A workspace can be visible but not focused in a multi-monitor setup
 %{workspace-root-container-layout}:: String. The layout (`v_tiles`, `h_tiles`, `v_accordion`, `h_accordion`) of the workspace the window belongs to.

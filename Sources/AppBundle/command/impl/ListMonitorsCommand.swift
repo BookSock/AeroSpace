@@ -4,14 +4,21 @@ import Common
 struct ListMonitorsCommand: Command {
     let args: ListMonitorsCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> BinaryExitCode {
-        let focus = focus
         var result = sortedMonitors
         if let focused = args.focused {
+            if isNativeSpaceStateUnavailableForMutation {
+                return .fail(io.err("Native macOS Space is unavailable"))
+            }
+            let focus = focus
             result = result.filter { (monitor) in (monitor.activeWorkspace == focus.workspace) == focused }
         }
         if let mouse = args.mouse {
+            if isNativeSpaceStateUnavailableForMutation {
+                return .fail(io.err("Native macOS Space is unavailable"))
+            }
             let mouseWorkspace = mouseLocation.monitorApproximation.activeWorkspace
             result = result.filter { (monitor) in (monitor.activeWorkspace == mouseWorkspace) == mouse }
         }

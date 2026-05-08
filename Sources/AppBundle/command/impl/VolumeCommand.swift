@@ -5,6 +5,7 @@ import ISSoundAdditions
 struct VolumeCommand: Command {
     let args: VolumeCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> BinaryExitCode {
         switch args.action.val {

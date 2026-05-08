@@ -4,23 +4,28 @@ import Common
 struct ListWindowsCommand: Command {
     let args: ListWindowsCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    /*conforms*/ let canRunWhenNativeSpaceUnavailable = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> BinaryExitCode {
-        let focus = focus
+        if isNativeSpaceStateUnavailableForMutation {
+            return try await output(windows: [], io: io)
+        }
         var windows: [Window] = []
 
         if args.filteringOptions.focused {
+            let focus = focus
             switch focus.windowOrNil {
                 case let window?: windows = [window]
                 case nil: return .fail(io.err(noWindowIsFocused))
             }
         } else {
+            let focusedWorkspace = args.filteringOptions.workspaces.contains(.focused) ? focus.workspace : nil
             var workspaces: Set<Workspace> = args.filteringOptions.workspaces.isEmpty
                 ? Workspace.all.toSet()
                 : args.filteringOptions.workspaces
                     .flatMap { filter in
                         switch filter {
-                            case .focused: [focus.workspace]
+                            case .focused: focusedWorkspace.map { [$0] } ?? []
                             case .visible: Workspace.all.filter(\.isVisible)
                             case .name(let name): [Workspace.get(byName: name.raw)]
                         }
@@ -40,6 +45,11 @@ struct ListWindowsCommand: Command {
             }
         }
 
+        return try await output(windows: windows, io: io)
+    }
+
+    @MainActor
+    private func output(windows: [Window], io: CmdIo) async throws -> BinaryExitCode {
         if args.outputOnlyCount {
             return .succ(io.out("\(windows.count)"))
         } else {
