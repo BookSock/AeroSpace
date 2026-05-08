@@ -76,8 +76,13 @@ struct FrozenWorkspace: Sendable {
         let potentialOrphans = prevRoot.allLeafWindowsRecursive
         prevRoot.unbindFromParent()
         restoreTreeRecursive(frozenContainer: frozenWorkspace.rootTilingNode, parent: workspace, index: INDEX_BIND_LAST)
+        if config.experimentalForceFloatingWindows {
+            for window in workspace.rootTilingContainer.allLeafWindowsRecursive {
+                window.bindAsFloatingWindow(to: workspace)
+            }
+        }
         for window in (potentialOrphans - workspace.rootTilingContainer.allLeafWindowsRecursive) {
-            try await window.relayoutWindow(on: workspace, forceTile: true)
+            try await window.relayoutWindow(on: workspace, forceTile: !config.experimentalForceFloatingWindows)
         }
     }
 

@@ -29,6 +29,16 @@ final class ConfigTest: XCTestCase {
         XCTAssertTrue(config.experimentalNativeSpaces)
     }
 
+    func testParseExperimentalForceFloatingWindows() {
+        let (config, errors) = parseConfig(
+            """
+            experimental-force-floating-windows = true
+            """,
+        )
+        assertEquals(errors, [])
+        XCTAssertTrue(config.experimentalForceFloatingWindows)
+    }
+
     func testConfigVersionOutOfBounds() {
         let (_, errors) = parseConfig(
             """

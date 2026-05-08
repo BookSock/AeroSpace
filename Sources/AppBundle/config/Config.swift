@@ -44,6 +44,7 @@ struct Config: ConvenienceCopyable {
     var startAtLogin: Bool = false
     var autoReloadConfig: Bool = false
     var experimentalNativeSpaces: Bool = false
+    var experimentalForceFloatingWindows: Bool = false
     var automaticallyUnhideMacosHiddenApps: Bool = false
     var accordionPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true

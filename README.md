@@ -8,6 +8,8 @@ AeroSpace is an i3-like tiling window manager for macOS
 > This fork carries an experimental `experimental-native-spaces` mode that namespaces
 > AeroSpace workspaces by native macOS Spaces. It uses private SkyLight APIs, so it is
 > best treated as a personal/testing fork rather than an upstream-supported workflow.
+> It also includes `experimental-force-floating-windows` for workflows that want
+> AeroSpace workspaces without automatic tiling.
 
 Videos:
 - [YouTube 91 sec Demo](https://www.youtube.com/watch?v=UOl7ErqWbrk)

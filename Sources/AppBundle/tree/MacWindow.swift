@@ -224,8 +224,17 @@ private func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: M
     return switch try await macApp.getAxUiElementWindowType(windowId, windowLevel) {
         case .popup: BindingData(parent: macosPopupWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         case .dialog: BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-        case .window: unbindAndGetBindingDataForNewTilingWindow(workspace, window: window)
+        case .window: unbindAndGetBindingDataForNewRegularWindow(workspace, window: window)
     }
+}
+
+@MainActor
+private func unbindAndGetBindingDataForNewRegularWindow(_ workspace: Workspace, window: Window?) -> BindingData {
+    if config.experimentalForceFloatingWindows {
+        window?.unbindFromParent()
+        return BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    }
+    return unbindAndGetBindingDataForNewTilingWindow(workspace, window: window)
 }
 
 // The function is private because it's unsafe. It leaves the window in unbound state

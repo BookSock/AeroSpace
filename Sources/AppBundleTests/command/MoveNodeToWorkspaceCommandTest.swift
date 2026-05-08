@@ -55,6 +55,21 @@ final class MoveNodeToWorkspaceCommandTest: XCTestCase {
         assertEquals(Workspace.get(byName: "b").children.filterIsInstance(of: Window.self).singleOrNil()?.windowId, 1)
     }
 
+    func testForceFloatingMovesTiledWindowAsFloating() async throws {
+        config.experimentalForceFloatingWindows = true
+        let workspaceA = Workspace.get(byName: "a")
+        workspaceA.rootTilingContainer.apply {
+            _ = TestWindow.new(id: 1, parent: $0).focusWindow()
+        }
+
+        try await MoveNodeToWorkspaceCommand(args: MoveNodeToWorkspaceCmdArgs(workspace: "b")).run(.defaultEnv, .emptyStdin)
+
+        let workspaceB = Workspace.get(byName: "b")
+        XCTAssertTrue(workspaceA.isEffectivelyEmpty)
+        assertEquals(workspaceB.children.filterIsInstance(of: Window.self).singleOrNil()?.windowId, 1)
+        assertEquals(workspaceB.rootTilingContainer.children.count, 0)
+    }
+
     func testSummonWindow() async throws {
         let workspaceA = Workspace.get(byName: "a").apply {
             $0.rootTilingContainer.apply {

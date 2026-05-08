@@ -22,6 +22,11 @@ auto-reload-config = false
 # Only regular user Spaces are managed; fullscreen/tiled native Spaces are treated as unavailable.
 experimental-native-spaces = false
 
+# Experimental fork-only mode: keep automatically managed windows floating.
+# Normal app windows are attached directly to the workspace instead of the tiling tree.
+# Manual `layout tiling` can still put a window back into the tiling tree.
+experimental-force-floating-windows = false
+
 # Normalizations. See: https://nikitabobko.github.io/AeroSpace/guide#normalization
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true

@@ -10,7 +10,11 @@ struct FlattenWorkspaceTreeCommand: Command {
         let workspace = target.workspace
         let windows = workspace.rootTilingContainer.allLeafWindowsRecursive
         for window in windows {
-            window.bind(to: workspace.rootTilingContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)
+            if config.experimentalForceFloatingWindows {
+                window.bindAsFloatingWindow(to: workspace)
+            } else {
+                window.bind(to: workspace.rootTilingContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)
+            }
         }
         return .succ
     }
