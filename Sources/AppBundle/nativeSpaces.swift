@@ -122,6 +122,9 @@ func shouldRebindWindowToCurrentNativeSpace(from workspace: Workspace?, windowId
     guard snapshot.isUserSpace else { return false }
     guard workspace.nativeSpaceKey != snapshot.key else { return false }
     guard let windowSpaceIds = nativeSpaceIds(forWindowId: windowId), windowSpaceIds.count == 1 else { return false }
+    if !windowSpaceIds.isDisjoint(with: nativeSpaceIds(encodedIn: workspace.nativeSpaceKey)) {
+        return false
+    }
     return windowSpaceIds.isSubset(of: snapshot.spaceIds)
 }
 
@@ -143,9 +146,15 @@ func shouldCheckWindowLivenessInCurrentNativeSpace(
     guard isExperimentalNativeSpacesEnabled || nativeSpaceKeyForTests != nil else { return true }
     let currentNativeSpaceKey = snapshotNativeSpaceKey ?? currentNativeSpaceKey
     if let workspace = window.visualWorkspace {
-        return workspace.nativeSpaceKey == currentNativeSpaceKey
+        return workspace.nativeSpaceKey == currentNativeSpaceKey || currentNativeWindowIds?.contains(window.windowId) == true
     }
     return currentNativeWindowIds?.contains(window.windowId) == true
+}
+
+@MainActor
+func workspaceHasWindowInCurrentNativeSpace(_ workspace: Workspace) -> Bool {
+    guard isExperimentalNativeSpacesEnabled || nativeSpaceKeyForTests != nil else { return false }
+    return workspace.allLeafWindowsRecursive.contains { isWindowInCurrentNativeSpace(windowId: $0.windowId) }
 }
 
 @MainActor
@@ -239,6 +248,12 @@ private func nativeSpaceKey(from rows: [CurrentSpaceRow]) -> NativeSpaceKey? {
     let parts = rows
         .map { "\($0.displayIdentifier):\($0.spaceId)" }
     return parts.isEmpty ? nil : NativeSpaceKey(raw: parts.joined(separator: "|"))
+}
+
+private func nativeSpaceIds(encodedIn key: NativeSpaceKey) -> Set<UInt64> {
+    Set(key.raw.split(separator: "|").compactMap { part in
+        part.split(separator: ":").last.flatMap { UInt64($0) }
+    })
 }
 
 @MainActor

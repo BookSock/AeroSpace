@@ -76,6 +76,12 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
             .sorted()
     }
 
+    @MainActor static var withWindowsInCurrentNativeSpace: [Workspace] {
+        workspaceNameToWorkspace.values
+            .filter { $0.nativeSpaceKey != currentNativeSpaceKey && workspaceHasWindowInCurrentNativeSpace($0) }
+            .sorted()
+    }
+
     @MainActor static func get(byName name: String) -> Workspace {
         let key = WorkspaceLookupKey(nativeSpaceKey: currentNativeSpaceKey, name: name)
         if let existing = workspaceNameToWorkspace[key] {

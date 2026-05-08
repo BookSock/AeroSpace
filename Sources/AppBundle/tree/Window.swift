@@ -19,7 +19,7 @@ open class Window: TreeNode, Hashable {
 
     @MainActor static func get(byId windowId: UInt32) -> Window? { // todo make non optional
         let window = isUnitTest
-            ? (Workspace.all.flatMap { $0.allLeafWindowsRecursive } +
+            ? ((Workspace.all + Workspace.withWindowsInCurrentNativeSpace).flatMap { $0.allLeafWindowsRecursive } +
                 macosMinimizedWindowsContainer.allLeafWindowsRecursive +
                 macosPopupWindowsContainer.allLeafWindowsRecursive).first(where: { $0.windowId == windowId })
             : MacWindow.allWindowsMap[windowId]
@@ -28,7 +28,9 @@ open class Window: TreeNode, Hashable {
         guard let workspace = window.visualWorkspace else {
             return isWindowInCurrentNativeSpace(windowId: windowId) ? window : nil
         }
-        return workspace.nativeSpaceKey == currentNativeSpaceKey ? window : nil
+        return workspace.nativeSpaceKey == currentNativeSpaceKey || isWindowInCurrentNativeSpace(windowId: windowId)
+            ? window
+            : nil
     }
 
     @MainActor

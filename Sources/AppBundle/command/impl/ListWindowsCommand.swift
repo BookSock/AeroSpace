@@ -20,13 +20,14 @@ struct ListWindowsCommand: Command {
             }
         } else {
             let focusedWorkspace = args.filteringOptions.workspaces.contains(.focused) ? focus.workspace : nil
+            let nativeVisibleWorkspaces = Workspace.withWindowsInCurrentNativeSpace
             var workspaces: Set<Workspace> = args.filteringOptions.workspaces.isEmpty
-                ? Workspace.all.toSet()
+                ? (Workspace.all + nativeVisibleWorkspaces).toSet()
                 : args.filteringOptions.workspaces
                     .flatMap { filter in
                         switch filter {
                             case .focused: focusedWorkspace.map { [$0] } ?? []
-                            case .visible: Workspace.all.filter(\.isVisible)
+                            case .visible: (Workspace.all + nativeVisibleWorkspaces).filter(\.isVisible)
                             case .name(let name): [Workspace.get(byName: name.raw)]
                         }
                     }

@@ -518,6 +518,67 @@ final class NativeSpacesTest: XCTestCase {
         XCTAssertTrue(shouldRebindWindowToCurrentNativeSpace(from: oldWorkspace, windowId: 1))
     }
 
+    func testDisplayTupleSwitchDoesNotRebindWindowOnUnchangedDisplay() {
+        let oldTuple = NativeSpaceKey(raw: "external:7072|built-in:3907")
+        let newTuple = NativeSpaceKey(raw: "external:7072|built-in:5005")
+
+        setUpWorkspacesForTests(nativeSpaceKey: oldTuple)
+        let externalWorkspace = Workspace.get(byName: "external")
+
+        nativeSpaceKeyForTests = newTuple
+        currentNativeSpaceIdsForTests = [7072, 5005]
+        nativeSpaceIdsForWindowIdForTests[1] = [7072]
+        XCTAssertFalse(shouldRebindWindowToCurrentNativeSpace(from: externalWorkspace, windowId: 1))
+
+        nativeSpaceIdsForWindowIdForTests[1] = [5005]
+        XCTAssertTrue(shouldRebindWindowToCurrentNativeSpace(from: externalWorkspace, windowId: 1))
+    }
+
+    func testDisplayTupleSwitchKeepsUnchangedDisplayWindowVisible() async throws {
+        let oldTuple = NativeSpaceKey(raw: "external:7072|built-in:3907")
+        let newTuple = NativeSpaceKey(raw: "external:7072|built-in:5005")
+
+        setUpWorkspacesForTests(nativeSpaceKey: oldTuple)
+        TestWindow.new(id: 1, parent: Workspace.get(byName: "external").rootTilingContainer)
+        TestWindow.new(id: 2, parent: Workspace.get(byName: "built-in-old").rootTilingContainer)
+
+        nativeSpaceKeyForTests = newTuple
+        currentNativeSpaceIdsForTests = [7072, 5005]
+        nativeSpaceIdsForWindowIdForTests[1] = [7072]
+        nativeSpaceIdsForWindowIdForTests[2] = [3907]
+
+        XCTAssertNotNil(Window.get(byId: 1))
+        XCTAssertNil(Window.get(byId: 2))
+
+        let result = try await parseCommand("list-windows --all --count").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        assertEquals(result.stdout, ["1"])
+    }
+
+    func testDisplayTupleSwitchChecksLivenessForUnchangedDisplayWindow() {
+        let oldTuple = NativeSpaceKey(raw: "external:7072|built-in:3907")
+        let newTuple = NativeSpaceKey(raw: "external:7072|built-in:5005")
+
+        setUpWorkspacesForTests(nativeSpaceKey: oldTuple)
+        let externalWindow = TestWindow.new(id: 1, parent: Workspace.get(byName: "external").rootTilingContainer)
+        let oldBuiltInWindow = TestWindow.new(id: 2, parent: Workspace.get(byName: "built-in-old").rootTilingContainer)
+
+        nativeSpaceKeyForTests = newTuple
+        currentNativeSpaceIdsForTests = [7072, 5005]
+        nativeSpaceIdsForWindowIdForTests[1] = [7072]
+        nativeSpaceIdsForWindowIdForTests[2] = [3907]
+
+        XCTAssertTrue(shouldCheckWindowLivenessInCurrentNativeSpace(
+            externalWindow,
+            snapshotNativeSpaceKey: newTuple,
+            currentNativeWindowIds: [1],
+        ))
+        XCTAssertFalse(shouldCheckWindowLivenessInCurrentNativeSpace(
+            oldBuiltInWindow,
+            snapshotNativeSpaceKey: newTuple,
+            currentNativeWindowIds: [1],
+        ))
+    }
+
     private func userWorkspaceNames() -> [String] {
         Workspace.all.map(\.name).filter { $0 != "setUpWorkspacesForTests" }
     }
